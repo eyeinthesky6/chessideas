@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Chessboard } from 'react-chessboard';
 
 interface BoardProps {
@@ -17,28 +17,6 @@ const Board: React.FC<BoardProps> = ({
   orientation = 'white'
 }) => {
 
-  // DIAGNOSTIC LOGGING
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[Board] Rendered. Interactive: ${isInteractive}, Visual: ${visualState}, FEN: ${fen.substring(0, 20)}...`);
-    }
-  }, [fen, isInteractive, visualState]);
-
-  // Wrapper to intercept and log move attempts
-  const handlePieceDrop = (source: string, target: string) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[Board] Drag ${source} -> ${target}`);
-    }
-    
-    // Pass to parent handler
-    const result = onPieceDrop(source, target);
-    
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[Board] Move Result: ${result}`);
-    }
-    return result;
-  };
-  
   const getBorderColor = () => {
     switch (visualState) {
       case 'correct': return 'border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.5)]';
@@ -51,15 +29,11 @@ const Board: React.FC<BoardProps> = ({
   const safePosition = (fen && fen.trim() !== '') ? fen : 'start';
 
   return (
-    <div 
-      className={`w-full max-w-[500px] aspect-square shadow-2xl rounded-lg overflow-hidden border-4 transition-all duration-300 relative ${getBorderColor()}`}
-      // Force pointer events and prevent touch scrolling
-      style={{ touchAction: 'none', pointerEvents: 'auto' }} 
-    >
+    <div className={`w-full max-w-[500px] aspect-square shadow-2xl rounded-lg overflow-hidden border-4 transition-all duration-300 relative ${getBorderColor()}`}>
       <Chessboard 
         id="DrillBoard"
         position={safePosition} 
-        onPieceDrop={handlePieceDrop}
+        onPieceDrop={onPieceDrop}
         boardOrientation={orientation}
         customDarkSquareStyle={{ backgroundColor: '#334155' }}
         customLightSquareStyle={{ backgroundColor: '#94a3b8' }}

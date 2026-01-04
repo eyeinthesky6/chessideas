@@ -1,5 +1,5 @@
 {
-  "name": "CoachReps",
-  "description": "A focused chess training app that converts your Lichess games into spaced-repetition drills with an AI Coach powered by Gemini.",
+  "name": "Chessideas",
+  "description": "A focused chess training app that converts your Lichess games into spaced-repetition drills with an AI Coach.",
   "requestFramePermissions": []
 }

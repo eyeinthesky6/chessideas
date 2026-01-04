@@ -11,19 +11,14 @@ export const generateCoachResponse = async (
   fen: string
 ): Promise<CoachResponse> => {
   if (!apiKey) {
-    return {
-      observation: "Demo Mode: API Key missing.",
-      explanation: "Without an API key, I cannot analyze this specific position.",
-      ruleOfThumb: "Always connect your API key for live coaching.",
-      verdict: isCorrect ? 'PRAISE' : 'CORRECTION'
-    };
+    throw new Error("API Key missing");
   }
 
   const model = "gemini-3-flash-preview";
 
   // STRICT GUARDRAILS PROMPT
   const context = `
-    ROLE: You are a strict Chess Engine Proxy (Stockfish 16 level).
+    ROLE: You are a strict Chess Coach (IM/GM level).
     TASK: Analyze the student's move against the drill solution.
     
     CONTEXT DATA:
@@ -35,22 +30,19 @@ export const generateCoachResponse = async (
     - Correct Move: ${isCorrect ? "YES" : "NO"}
     - Solution Sequence: ${drill.solutionSan.join(' ')}
 
-    GUARDRAILS (STRICT COMPLIANCE REQUIRED):
-    1. DO NOT be conversational. Be analytical and terse.
-    2. REFERENCE specific squares/pieces in your "observation".
-    3. EXPLANATION must be tactical/concrete, not abstract. Max 3 bullet points.
-    4. RULE OF THUMB must be a single memorable principle (Max 10 words).
-    5. VERDICT must accurately reflect the outcome quality.
+    GUARDRAILS:
+    1. Be concise.
+    2. Reference specific squares.
+    3. Explain the TACTICAL reason why the move is good or bad.
+    4. Provide a "Rule of Thumb".
 
     OUTPUT SCHEMA (JSON):
     {
-      "observation": "White Knight on f5 dominates the dark squares...",
-      "explanation": "• The move allows Rxf7...\n• Black cannot recapture due to...",
-      "ruleOfThumb": "Knights on the rim are dim.",
+      "observation": "White Knight on f5 is undefended...",
+      "explanation": "Capture leads to mate in 3.",
+      "ruleOfThumb": "Loose pieces drop off (LPDO).",
       "verdict": "${isCorrect ? 'PRAISE' : 'CORRECTION'}" 
     }
-    
-    Use "HINT" as verdict only if the move was a near-miss or alternate candidate.
   `;
 
   try {
@@ -73,40 +65,12 @@ export const generateCoachResponse = async (
     });
     
     const text = response.text;
-    if (!text) throw new Error("No response");
+    if (!text) throw new Error("Empty response from AI Coach");
     
     return JSON.parse(text) as CoachResponse;
   } catch (error) {
     console.error("Gemini Error:", error);
-    return {
-      observation: "Engine Disconnected",
-      explanation: "Analysis unavailable.",
-      ruleOfThumb: "Check connection.",
-      verdict: "HINT"
-    };
-  }
-};
-
-export const analyzeGameForDrills = async (pgn: string): Promise<string> => {
-  if (!apiKey) return "";
-
-  const model = "gemini-3-flash-preview";
-  // Enforce stricter analysis JSON
-  const prompt = `
-    Analyze this chess PGN. Identify 1 CRITICAL tactical error or missed opportunity (Blunder/Miss).
-    Return JSON format: { "fen": "...", "theme": "TACTICS", "goal": "Find the winning sequence", "solutionSan": ["move1", "move2"], "difficulty": 3, "explanation": "..." }
-    PGN: ${pgn}
-  `;
-
-  try {
-     const response = await ai.models.generateContent({
-      model,
-      contents: prompt,
-      config: { responseMimeType: "application/json" }
-    });
-    return response.text || "";
-  } catch (e) {
-    console.error(e);
-    return "";
+    // Return null to let UI handle "Coach unavailable"
+    throw error;
   }
 };

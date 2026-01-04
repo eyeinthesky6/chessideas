@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserProfile, Drill, DrillSchedule, Theme, DrillOutcome, LinkedAccount, AccountProvider, TrainingMode, ChessGame, TimeControl } from './types';
 import { fetchRecentGames } from './services/lichessService';
 import { fetchChessComGames } from './services/chesscomService';
-import { generateDrillsFromGames, getDemoDrills, getDemoGames, generateDrillFromMode } from './services/analysisService';
+import { generateDrillFromMode, generateDemoDrill, getDemoGames } from './services/analysisService';
 import { scheduler } from './services/scheduler';
 import { createInitialSkill, updateSkill } from './services/skillService';
 import { logEvent, getRecentLogs } from './services/logger';
@@ -39,7 +39,6 @@ export default function App() {
     try {
         const loadedUser = persistence.loadUser();
         if (loadedUser) {
-          console.log("[App] Loaded User:", loadedUser.username);
           setUser(loadedUser);
           setRawGames(persistence.loadGames());
           setDrills(persistence.loadDrills());
@@ -72,40 +71,28 @@ export default function App() {
   };
 
   const handleImport = async (usernameInput: string, provider: AccountProvider) => {
-    if (user && user.accounts.some(a => a.provider === provider && a.username.toLowerCase() === usernameInput.toLowerCase())) {
-        showToast(`${provider} account already linked.`, 'info');
-        return;
-    }
-
     setLoadingState({ status: `Connecting to ${provider}...`, progress: 10 });
     try {
       let newGames: ChessGame[] = [];
-      let generatedDrills: Drill[] = [];
       let isDemo = false;
 
+      // EXPLICIT DEMO LOGIC
       if (usernameInput === 'demo') {
          newGames = getDemoGames(); 
          isDemo = true;
-         generatedDrills = getDemoDrills();
       } else if (provider === 'lichess') {
          newGames = await fetchRecentGames(usernameInput, 60);
-         setLoadingState({ status: `Analyzing ${newGames.length} games...`, progress: 40 });
-         generatedDrills = await generateDrillsFromGames(newGames);
       } else {
          newGames = await fetchChessComGames(usernameInput, 40);
-         setLoadingState({ status: `Analyzing ${newGames.length} games...`, progress: 40 });
-         generatedDrills = await generateDrillsFromGames(newGames);
       }
 
-      if (newGames.length === 0 && !isDemo) {
+      setLoadingState({ status: `Analyzed ${newGames.length} games.`, progress: 100 });
+
+      if (newGames.length === 0) {
         setLoadingState(null);
-        showToast(`No ${provider} games found for '${usernameInput}'.`, 'error');
+        showToast(`No games found for ${usernameInput}`, 'error');
         return;
       }
-
-      setLoadingState({ status: "Syncing profile...", progress: 90 });
-      const newSchedules: Record<string, DrillSchedule> = {};
-      generatedDrills.forEach(d => { if (!schedules[d.id]) newSchedules[d.id] = scheduler.createInitialSchedule(d.id); });
 
       const finalUsername = isDemo ? 'Demo User' : (newGames[0]?.white === 'Anonymous' ? usernameInput : newGames[0]?.white || usernameInput);
       
@@ -122,17 +109,9 @@ export default function App() {
 
       setUser(newUserProfile);
       
-      if (!user) {
-          setRawGames(newGames);
-          setDrills(generatedDrills);
-          setSchedules(newSchedules);
-      } else {
-          const gameIds = new Set(rawGames.map(g => g.id));
-          const uniqueNewGames = newGames.filter(g => !gameIds.has(g.id));
-          setRawGames(prev => [...prev, ...uniqueNewGames]);
-          setDrills(prev => [...prev, ...generatedDrills]);
-          setSchedules(prev => ({...prev, ...newSchedules}));
-      }
+      const gameIds = new Set(rawGames.map(g => g.id));
+      const uniqueNewGames = newGames.filter(g => !gameIds.has(g.id));
+      setRawGames(prev => [...prev, ...uniqueNewGames]);
 
       setLoadingState(null);
       setView(View.DASHBOARD);
@@ -145,32 +124,34 @@ export default function App() {
 
   const handleModeSelect = (mode: TrainingMode, options: any = {}) => {
       setLoadingState({ status: "Preparing training session...", progress: 50 });
-      const eligibleGames = rawGames.filter(g => selectedTimeControls.includes(g.timeControl) || g.timeControl === 'unknown');
       
-      if (eligibleGames.length === 0) {
-          setLoadingState(null);
-          showToast("No games found.", 'error');
-          return;
-      }
-      
-      let selectedMode = mode;
-      if (mode === TrainingMode.ANY) {
-          const r = Math.random();
-          if (r < 0.4) selectedMode = TrainingMode.CRITICAL_POSITION;
-          else if (r < 0.65) selectedMode = TrainingMode.RANDOM_MOMENT;
-          else if (r < 0.85) selectedMode = TrainingMode.START_FROM_MOVE;
-          else selectedMode = TrainingMode.ENDGAME_FINISH;
-      }
-      
-      const drill = generateDrillFromMode(eligibleGames, selectedMode, options);
+      try {
+        // If we are in demo mode, allow any of the demo games
+        const isDemoUser = rawGames.some(g => g.id.startsWith('demo-game'));
+        const eligibleGames = isDemoUser 
+            ? rawGames 
+            : rawGames.filter(g => selectedTimeControls.includes(g.timeControl) || g.timeControl === 'unknown');
+        
+        if (eligibleGames.length === 0) {
+            throw new Error("No games match selected filters.");
+        }
+        
+        let selectedMode = mode;
+        if (mode === TrainingMode.ANY) {
+            const r = Math.random();
+            if (r < 0.4) selectedMode = TrainingMode.CRITICAL_POSITION;
+            else if (r < 0.65) selectedMode = TrainingMode.RANDOM_MOMENT;
+            else if (r < 0.85) selectedMode = TrainingMode.START_FROM_MOVE;
+            else selectedMode = TrainingMode.ENDGAME_FINISH;
+        }
 
-      if (!drill || !drill.fen || drill.fen === 'start' || drill.fen === 'startpos') {
-          setLoadingState(null);
-          showToast("Could not generate valid drill.", 'error');
-          return;
-      }
+        const drill = generateDrillFromMode(eligibleGames, selectedMode, options);
+        startSessionWithDrill(drill);
 
-      startSessionWithDrill(drill);
+      } catch (e: any) {
+          setLoadingState(null);
+          showToast(e.message || "Drill generation failed.", 'error');
+      }
   };
 
   const startSessionWithDrill = (drill: Drill) => {
@@ -258,7 +239,10 @@ export default function App() {
   );
 
   if (view === View.MODE_SELECTION) {
-    const eligibleCount = rawGames.filter(g => selectedTimeControls.includes(g.timeControl) || g.timeControl === 'unknown').length;
+    // Re-verify counts for UI
+    const isDemoUser = rawGames.some(g => g.id.startsWith('demo-game'));
+    const eligibleCount = isDemoUser ? rawGames.length : rawGames.filter(g => selectedTimeControls.includes(g.timeControl) || g.timeControl === 'unknown').length;
+    
     return (
       <Layout>
           <div className="min-h-screen p-6 flex flex-col items-center">
