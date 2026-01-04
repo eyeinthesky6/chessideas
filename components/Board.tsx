@@ -37,7 +37,7 @@ const Board: React.FC<BoardProps> = ({
         boardOrientation={orientation}
         customDarkSquareStyle={{ backgroundColor: '#334155' }}
         customLightSquareStyle={{ backgroundColor: '#94a3b8' }}
-        arePiecesDraggable={isInteractive && visualState === 'neutral'}
+        arePiecesDraggable={isInteractive}
         animationDuration={200}
       />
       

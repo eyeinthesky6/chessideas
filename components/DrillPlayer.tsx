@@ -191,30 +191,32 @@ export const DrillPlayer: React.FC<DrillPlayerProps> = ({ drill, game, onComplet
          <div className="text-xs font-mono text-slate-500">{drill.goal}</div>
       </div>
 
-      <div className="flex-1 relative flex flex-col items-center justify-center p-4 min-h-0">
-         <div className="w-full max-w-[400px] aspect-square relative z-0">
-            <Board 
-                fen={fen} 
-                onPieceDrop={onPieceDrop}
-                visualState={visualState}
-                orientation={chessInstance?.turn() === 'b' ? 'black' : 'white'}
-                isInteractive={!outcome && !isProcessing}
-            />
+      <div className="flex-1 relative flex flex-col items-center justify-center p-4 min-h-0 overflow-hidden">
+         <div className="w-full max-w-[500px] flex flex-col items-center gap-3">
+            <div className="w-full aspect-square relative z-0">
+               <Board 
+                   fen={fen} 
+                   onPieceDrop={onPieceDrop}
+                   visualState={visualState}
+                   orientation={chessInstance?.turn() === 'b' ? 'black' : 'white'}
+                   isInteractive={!outcome && !isProcessing}
+               />
+               
+               {/* Coach Loading Overlay */}
+               {isCoaching && (
+                    <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg z-20 animate-fade-in">
+                        <div className="w-12 h-12 mb-4 rounded-full border-4 border-slate-700 border-t-cyan-500 animate-spin"></div>
+                        <div className="text-cyan-400 font-bold text-sm">AI Coach Analyzing...</div>
+                    </div>
+               )}
+            </div>
             
-            {/* Coach Loading Overlay */}
-            {isCoaching && (
-                 <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg z-20 animate-fade-in">
-                     <div className="w-12 h-12 mb-4 rounded-full border-4 border-slate-700 border-t-cyan-500 animate-spin"></div>
-                     <div className="text-cyan-400 font-bold text-sm">AI Coach Analyzing...</div>
-                 </div>
-            )}
-         </div>
-         
-         <div className="mt-4 flex flex-col items-center space-y-2">
-             <div className="text-xs uppercase tracking-widest text-slate-500 font-semibold">{turnColor} to Move</div>
-             <div className={`px-4 py-2 rounded-lg text-sm text-center font-medium transition-all ${feedback ? 'bg-slate-800 text-white opacity-100' : 'opacity-0'}`}>
-                 {feedback || '...'}
-             </div>
+            <div className="flex flex-col items-center space-y-2 w-full">
+                <div className="text-xs uppercase tracking-widest text-slate-500 font-semibold">{turnColor} to Move</div>
+                <div className={`px-4 py-2 rounded-lg text-sm text-center font-medium transition-all w-full ${feedback ? 'bg-slate-800 text-white opacity-100' : 'opacity-0'}`}>
+                    {feedback || '...'}
+                </div>
+            </div>
          </div>
       </div>
 
