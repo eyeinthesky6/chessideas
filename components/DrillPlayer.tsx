@@ -23,7 +23,7 @@ export const DrillPlayer: React.FC<DrillPlayerProps> = ({ drill, game, onComplet
         return new Chess(drill.fen);
     } catch (e) {
         console.error("Failed to init chess instance", e);
-        return new Chess(); // Fallback to start, though this indicates broken drill
+        return null; // Return null to indicate failure (handled in useEffect/Render)
     }
   });
   

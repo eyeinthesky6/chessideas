@@ -4,6 +4,9 @@ import { DEMO_PGN_ANDERSSEN, DEMO_PGN_FISCHER, DEMO_PGN_KASPAROV, DEMO_PGN_MORPH
 
 const cleanPgn = (pgn: string): string => {
   let clean = pgn;
+  // Normalize whitespace FIRST to ensure reliable regex matching (especially for $ at end of string)
+  clean = clean.replace(/\s+/g, " ").trim();
+
   // Remove comments { ... }
   clean = clean.replace(/\{[^}]*\}/g, " ");
   // Remove variations ( ... )
@@ -12,9 +15,10 @@ const cleanPgn = (pgn: string): string => {
   clean = clean.replace(/\[.*?\]/g, " ");
   // Remove numeric annotation glyphs like $1, $20
   clean = clean.replace(/\$\d+/g, " ");
-  // Remove Result markers at the end
+  // Remove Result markers at the end (now works reliably because trailing whitespace is gone)
   clean = clean.replace(/(1-0|0-1|1\/2-1\/2|\*)$/, "");
-  // Normalize whitespace to single spaces
+
+  // Normalize whitespace AGAIN to clean up artifacts from replacements
   clean = clean.replace(/\s+/g, " ").trim();
   return clean;
 };
@@ -187,9 +191,21 @@ export const generateDrillFromMode = (
     // 4. Verify State
     const startFen = chess.fen();
     
+    // Check if the board position is effectively the start position (ignoring move counters)
+    const startFenBoard = startFen.split(' ')[0];
+    const globalStartBoard = GLOBAL_START_FEN.split(' ')[0];
+
     // Avoid Start Position (unless specifically requested by Start From Move 1)
-    if (mode !== TrainingMode.START_FROM_MOVE && startFen === GLOBAL_START_FEN) {
+    if (mode !== TrainingMode.START_FROM_MOVE && startFenBoard === globalStartBoard) {
         console.log("Skipping drill generated at start position.");
+        continue;
+    }
+
+    // Safety Check: Verify FEN is valid for constructor
+    try {
+        const check = new Chess(startFen);
+    } catch (e) {
+        console.warn("Generated FEN is invalid for constructor:", startFen);
         continue;
     }
 
